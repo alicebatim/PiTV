@@ -48,11 +48,10 @@ After reboot:
 1. 	Connect a DVB T/T2 tuner (e.g. Raspberry Pi TV HAT).
 2. 	From a client on the PiTV AP, 
 
-open:
-
-```http://pitv:9981```
+open:  ```http://pitv:9981```
 
 3. 	Log in with the admin credentials you set during installation.
+
 4. 	Follow the wizard:
 
 • 	Select your tuner under Configuration → DVB Inputs → TV Adapters.
@@ -64,15 +63,6 @@ open:
 • 	Scan muxes → discover services → map services to channels.
 
 5. 	Test streaming by clicking the play icon next to a channel.
-
-Access Control
-
-By default, Tvheadend requires login. You can allow LAN clients automatically:
-
-• 	Edit :
-``` /home/hts/.hts/tvheadend/accesscontrol/lan.json```
-• 	Restart Tvheadend:
-```sudo systemctl restart tvheadend```
 
 Clients
 
