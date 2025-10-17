@@ -23,7 +23,9 @@ http://pitv:9981
 
 Clone this repo and run the setup script on a fresh Raspberry Pi OS Lite:
 
-```bash
+```
+```
+bash
 git clone https://github.com/yourname/pitv.git
 cd pitv
 chmod +x setup-pitv.sh
@@ -31,7 +33,7 @@ chmod +x setup-pitv.sh
 
 Reboot when finished.
 
-Wi‑Fi Access Point
+WiFi Access Point
 • 	SSID: 
 • 	Passphrase:  (set in )
 • 	Subnet: 
@@ -39,32 +41,33 @@ Wi‑Fi Access Point
 
 Tvheadend Setup
 Tvheadend is installed automatically. After reboot:
-1. 	Connect a DVB‑T/T2 tuner (e.g. Raspberry Pi TV HAT or USB stick).
+1. 	Connect a DVB T/T2 tuner (e.g. Raspberry Pi TV HAT).
 2. 	From a client on the PiTV AP, open:
-
+```http://pitv:9981```
 3. 	Log in with the admin credentials you set during installation.
 4. 	Follow the wizard:
 • 	Select your tuner under Configuration → DVB Inputs → TV Adapters.
-• 	Create a DVB‑T Network for your region.
-• 	Add muxes (frequencies) for your transmitter (Tvheadend can auto‑populate).
+• 	Create a DVB-T Network for your region.
+• 	Add muxes (frequencies) for your transmitter (Tvheadend can auto populate).
 • 	Scan muxes → discover services → map services to channels.
-5. 	Test streaming by clicking the ▶ icon next to a channel.
+5. 	Test streaming by clicking the play icon next to a channel.
 
 Access Control
 By default, Tvheadend requires login. You can allow LAN clients automatically:
 • 	Edit :
-
+```/home/hts/.hts/tvheadend/accesscontrol/lan.json
+```
 • 	Restart Tvheadend:
-
-
+```sudo systemctl restart tvheadend
+```
 Clients
 • 	Kodi: Enable the Tvheadend PVR Client add‑on, point it to .
 • 	VLC: Open .
 • 	Browser: Use the Tvheadend web UI for EPG and streaming.
 
 Self‑Healing
-• 	 ensures the AP interface is recreated if it disappears.
-• 	 runs every 60s to check and repair automatically.
+• 	 `wlan0_ap-heal.service` ensures the AP interface is recreated if it disappears.
+• 	 `wlan0_ap-heal.timer` runs every 60s to check and repair automatically.
 
 Repository Contents
 • 	 – one‑shot installer for AP‑STA, NAT, dnsmasq, hostapd, Tvheadend, and self‑healing.
