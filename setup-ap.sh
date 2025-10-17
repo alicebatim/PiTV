@@ -1,0 +1,151 @@
+#!/bin/bash
+set -e
+
+# ============================================================
+# PiTV AP-STA Setup Script
+# ------------------------------------------------------------
+# This script configures a Raspberry Pi to act as a dual-role
+# Wi-Fi device:
+#   - wlan0: connects upstream to your home Wi-Fi (STA mode)
+#   - wlan0_ap: provides a local access point (AP mode)
+#
+# It installs and configures:
+#   - systemd-networkd (for clean interface separation)
+#   - dnsmasq (for DHCP/DNS on the AP subnet)
+#   - hostapd (for the Wi-Fi access point)
+#   - iptables-persistent (for NAT/masquerading)
+#
+# It also creates a self-healing systemd unit + timer that
+# automatically repairs the AP interface if it disappears.
+#
+# Result: Clients can connect to SSID "PiTV", get an IP in
+# 192.168.50.x, and reach the internet via NAT through wlan0.
+# ============================================================
+
+echo "[*] Updating system and installing packages..."
+sudo apt update && sudo apt install -y hostapd dnsmasq iw iptables-persistent systemd-networkd
+
+# ------------------------------------------------------------
+# Configure systemd-networkd
+# ------------------------------------------------------------
+# wlan0: DHCP client for upstream Wi-Fi
+# wlan0_ap: static IP 192.168.50.1/24 for AP subnet
+echo "[*] Configuring systemd-networkd..."
+cat <<EOF | sudo tee /etc/systemd/network/10-wlan0.network
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+EOF
+
+cat <<EOF | sudo tee /etc/systemd/network/20-wlan0_ap.network
+[Match]
+Name=wlan0_ap
+
+[Network]
+Address=192.168.50.1/24
+EOF
+
+sudo systemctl enable systemd-networkd
+
+# ------------------------------------------------------------
+# Configure dnsmasq
+# ------------------------------------------------------------
+# Provides DHCP leases and DNS for AP clients.
+# - Range: 192.168.50.50–150
+# - Gateway: 192.168.50.1
+# - DNS: Pi itself + Cloudflare fallback
+# - Alias: "pitv" resolves to 192.168.50.1
+echo "[*] Configuring dnsmasq..."
+cat <<EOF | sudo tee /etc/dnsmasq.d/pitv.conf
+interface=wlan0_ap
+dhcp-range=192.168.50.50,192.168.50.150,12h
+dhcp-option=3,192.168.50.1
+dhcp-option=6,192.168.50.1,1.1.1.1
+address=/pitv/192.168.50.1
+EOF
+
+# ------------------------------------------------------------
+# Configure hostapd
+# ------------------------------------------------------------
+# Defines the AP SSID, channel, and WPA2 key.
+# SSID: PiTV
+# WPA2 passphrase: YourStrongPassword
+echo "[*] Configuring hostapd..."
+cat <<EOF | sudo tee /etc/hostapd/hostapd.conf
+interface=wlan0_ap
+ssid=PiTV
+hw_mode=g
+channel=1
+wmm_enabled=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=YourStrongPassword
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+EOF
+
+sudo sed -i 's|#DAEMON_CONF="".*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+
+# ------------------------------------------------------------
+# Enable IP forwarding
+# ------------------------------------------------------------
+# Allows traffic from AP clients to be routed out via wlan0.
+echo "[*] Enabling IP forwarding..."
+sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+sudo sysctl -p
+
+# ------------------------------------------------------------
+# Configure NAT
+# ------------------------------------------------------------
+# Masquerades AP client traffic out through wlan0.
+echo "[*] Configuring NAT..."
+sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+sudo netfilter-persistent save
+
+# ------------------------------------------------------------
+# Self-healing systemd unit
+# ------------------------------------------------------------
+# Creates wlan0_ap if missing, assigns IP, and restarts
+# hostapd + dnsmasq. Timer runs every 60s to ensure AP stays up.
+echo "[*] Creating self-healing systemd unit..."
+cat <<EOF | sudo tee /etc/systemd/system/wlan0_ap-heal.service
+[Unit]
+Description=Self-healing AP stack (wlan0_ap + hostapd + dnsmasq)
+After=network.target
+Wants=hostapd.service dnsmasq.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/sbin/ip link set wlan0_ap down 2>/dev/null || true
+ExecStartPre=/sbin/iw dev wlan0_ap del 2>/dev/null || true
+ExecStart=/sbin/iw dev wlan0 interface add wlan0_ap type __ap
+ExecStartPost=/sbin/ip addr add 192.168.50.1/24 dev wlan0_ap
+ExecStartPost=/sbin/ip link set wlan0_ap up
+ExecStartPost=/bin/systemctl restart hostapd
+ExecStartPost=/bin/systemctl restart dnsmasq
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat <<EOF | sudo tee /etc/systemd/system/wlan0_ap-heal.timer
+[Unit]
+Description=Periodic check & heal for wlan0_ap
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+
+[Install]
+WantedBy=timers.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable wlan0_ap-heal.service wlan0_ap-heal.timer
+sudo systemctl enable hostapd dnsmasq
+
+echo "[*] Setup complete. Reboot to activate PiTV AP."
