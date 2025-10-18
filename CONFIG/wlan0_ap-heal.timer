@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic check & heal for wlan0_ap
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+
+[Install]
+WantedBy=timers.target
+
