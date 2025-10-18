@@ -97,13 +97,35 @@ echo "[*] Enabling IP forwarding..."
 sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 sudo sysctl -p
 # ------------------------------------------------------------
-# Disable IPv6 (optional, prevents route/gateway leaks)
+# Disable IPv6 (prevents route/gateway leaks and Android "No Internet")
 # ------------------------------------------------------------
-echo "[*] Disabling IPv6 to prevent gateway advertisement leaks..."
-sudo sed -i '/^#*net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf
-sudo sed -i '/^#*net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf
-echo "net.ipv6.conf.all.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
-echo "net.ipv6.conf.default.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "[*] Disabling IPv6 system-wide and on AP interfaces..."
+
+# Remove any old disable_ipv6 entries from sysctl.conf
+sudo sed -i '/disable_ipv6/d' /etc/sysctl.conf
+
+# Disable IPv6 permanently
+cat <<EOF | sudo tee -a /etc/sysctl.conf
+net.ipv6.conf.all.disable_ipv6=1
+net.ipv6.conf.default.disable_ipv6=1
+net.ipv6.conf.lo.disable_ipv6=1
+net.ipv6.conf.wlan0.disable_ipv6=1
+net.ipv6.conf.wlan0_ap.disable_ipv6=1
+EOF
+
+# Apply changes immediately
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.wlan0.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.wlan0_ap.disable_ipv6=1
+
+# Flush any existing IPv6 addresses
+sudo ip -6 addr flush dev wlan0
+sudo ip -6 addr flush dev wlan0_ap
+
+
+
 # Bug The Raspberry Pi’s AP/STA dual-Wi-Fi setup was leaking the upstream network’s default gateway to clients connected to the access point.
 # House router
 # ------------------------------------------------------------
