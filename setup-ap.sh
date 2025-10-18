@@ -138,24 +138,53 @@ sudo ip -6 addr flush dev wlan0_ap
 # ------------------------------------------------------------
 # Configure NAT & packet forwarding (FIXED)
 # ------------------------------------------------------------
-echo "[*] Configuring secure NAT and forwarding..."
+# ------------------------------------------------------------
+# Enable IPv4 forwarding
+# ------------------------------------------------------------
+echo "[*] Enabling IPv4 forwarding..."
+sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+sudo sysctl -w net.ipv4.ip_forward=1
 
-# Flush old rules
+# ------------------------------------------------------------
+# Disable IPv6 (prevents gateway advertisement leaks and Android 'No Internet')
+# ------------------------------------------------------------
+echo "[*] Disabling IPv6 system-wide and on AP interfaces..."
+sudo sed -i '/disable_ipv6/d' /etc/sysctl.conf
+echo "net.ipv6.conf.all.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.default.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.lo.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.wlan0.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.wlan0_ap.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+
+# Apply immediately
+sudo sysctl -p
+
+# ------------------------------------------------------------
+# Configure NAT & packet forwarding (clean, safe)
+# ------------------------------------------------------------
+echo "[*] Configuring NAT and forwarding..."
+
+# Flush existing rules
 sudo iptables -F
 sudo iptables -t nat -F
 
-# Drop all forwarding by default
+# Set default FORWARD policy to DROP (blocks all by default)
 sudo iptables -P FORWARD DROP
 
 # Allow AP → upstream traffic
 sudo iptables -A FORWARD -i wlan0_ap -o wlan0 -j ACCEPT
+
+# Allow return traffic from upstream → AP
 sudo iptables -A FORWARD -i wlan0 -o wlan0_ap -m state --state ESTABLISHED,RELATED -j ACCEPT
 
-# NAT only traffic from 192.168.50.0/24 out wlan0
+# NAT only traffic from the AP subnet out wlan0
 sudo iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o wlan0 -j MASQUERADE
 
-# Persist rules
+# Persist rules across reboots
 sudo netfilter-persistent save
+sudo netfilter-persistent reload
+
+echo "[*] IPv4 forwarding, IPv6 disable, and NAT rules applied."
 
 # ------------------------------------------------------------
 # Self-healing systemd unit
@@ -171,17 +200,45 @@ Wants=hostapd.service dnsmasq.service
 
 [Service]
 Type=oneshot
+# Bring down and remove any old AP interface
 ExecStartPre=/sbin/ip link set wlan0_ap down 2>/dev/null || true
 ExecStartPre=/sbin/iw dev wlan0_ap del 2>/dev/null || true
+
+# Create AP interface
 ExecStart=/sbin/iw dev wlan0 interface add wlan0_ap type __ap
+
+# Assign static IP and bring up
 ExecStartPost=/sbin/ip addr add 192.168.50.1/24 dev wlan0_ap
 ExecStartPost=/sbin/ip link set wlan0_ap up
+
+# Apply IPv4 forwarding
+ExecStartPost=/sbin/sysctl -w net.ipv4.ip_forward=1
+
+# Disable IPv6 on all relevant interfaces
+ExecStartPost=/sbin/sysctl -w net.ipv6.conf.all.disable_ipv6=1
+ExecStartPost=/sbin/sysctl -w net.ipv6.conf.default.disable_ipv6=1
+ExecStartPost=/sbin/sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+ExecStartPost=/sbin/sysctl -w net.ipv6.conf.wlan0.disable_ipv6=1
+ExecStartPost=/sbin/sysctl -w net.ipv6.conf.wlan0_ap.disable_ipv6=1
+
+# Configure clean NAT & forwarding rules
+ExecStartPost=/sbin/iptables -F
+ExecStartPost=/sbin/iptables -t nat -F
+ExecStartPost=/sbin/iptables -P FORWARD DROP
+ExecStartPost=/sbin/iptables -A FORWARD -i wlan0_ap -o wlan0 -j ACCEPT
+ExecStartPost=/sbin/iptables -A FORWARD -i wlan0 -o wlan0_ap -m state --state ESTABLISHED,RELATED -j ACCEPT
+ExecStartPost=/sbin/iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o wlan0 -j MASQUERADE
+ExecStartPost=/usr/sbin/netfilter-persistent save
+
+# Start AP services
 ExecStartPost=/bin/systemctl restart hostapd
 ExecStartPost=/bin/systemctl restart dnsmasq
+
 RemainAfterExit=yes
 
 [Install]
 WantedBy=multi-user.target
+
 EOF
 
 cat <<EOF | sudo tee /etc/systemd/system/wlan0_ap-heal.timer
@@ -201,3 +258,4 @@ sudo systemctl enable wlan0_ap-heal.service wlan0_ap-heal.timer
 sudo systemctl enable hostapd dnsmasq
 
 echo "[*] Setup complete. Reboot to activate PiTV AP."
+#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
