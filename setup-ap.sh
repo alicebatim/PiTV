@@ -96,13 +96,43 @@ sudo sed -i 's|#DAEMON_CONF="".*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/
 echo "[*] Enabling IP forwarding..."
 sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
 sudo sysctl -p
-
+# ------------------------------------------------------------
+# Disable IPv6 (optional, prevents route/gateway leaks)
+# ------------------------------------------------------------
+echo "[*] Disabling IPv6 to prevent gateway advertisement leaks..."
+sudo sed -i '/^#*net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf
+sudo sed -i '/^#*net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf
+echo "net.ipv6.conf.all.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+echo "net.ipv6.conf.default.disable_ipv6=1" | sudo tee -a /etc/sysctl.conf
+# Bug The Raspberry Pi’s AP/STA dual-Wi-Fi setup was leaking the upstream network’s default gateway to clients connected to the access point.
+# House router
 # ------------------------------------------------------------
 # Configure NAT
 # ------------------------------------------------------------
 # Masquerades AP client traffic out through wlan0.
-echo "[*] Configuring NAT..."
-sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+# echo "[*] Configuring NAT..."
+# sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+# sudo netfilter-persistent save
+# ------------------------------------------------------------
+# Configure NAT & packet forwarding (FIXED)
+# ------------------------------------------------------------
+echo "[*] Configuring secure NAT and forwarding..."
+
+# Flush old rules
+sudo iptables -F
+sudo iptables -t nat -F
+
+# Drop all forwarding by default
+sudo iptables -P FORWARD DROP
+
+# Allow AP → upstream traffic
+sudo iptables -A FORWARD -i wlan0_ap -o wlan0 -j ACCEPT
+sudo iptables -A FORWARD -i wlan0 -o wlan0_ap -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# NAT only traffic from 192.168.50.0/24 out wlan0
+sudo iptables -t nat -A POSTROUTING -s 192.168.50.0/24 -o wlan0 -j MASQUERADE
+
+# Persist rules
 sudo netfilter-persistent save
 
 # ------------------------------------------------------------
