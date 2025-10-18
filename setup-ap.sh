@@ -258,4 +258,3 @@ sudo systemctl enable wlan0_ap-heal.service wlan0_ap-heal.timer
 sudo systemctl enable hostapd dnsmasq
 
 echo "[*] Setup complete. Reboot to activate PiTV AP."
-#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
