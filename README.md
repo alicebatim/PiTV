@@ -1,6 +1,6 @@
 # PiTV – Raspberry Pi AP‑STA Access Point with Tvheadend
 
-This project turns a Raspberry Pi into a self healing Wi-Fi access point that also runs Tvheadend for Freeview/DVB streaming.  
+This project turns a Raspberry Pi Zero 2w into a self healing Wi-Fi access point that also runs Tvheadend for Freeview/DVB streaming.  
 Clients can connect to the Pi’s SSID (`PiTV`), get an IP in the `192.168.50.x` range, and immediately access Tvheadend at:
 
 http://pitv:9981
