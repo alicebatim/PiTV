@@ -165,3 +165,5 @@ sudo reboot
 * The setup disables IPv6 to avoid Android “No Internet” warnings.  
 * NAT/iptables rules are configured to prevent gateway leaks.  
 * Make sure your upstream Wi-Fi (`wlan0`) is functional before running the AP.
+* use sudo apt install tcpdump `sudo tcpdump -i wlan0 port 67 or port 68` check for DHCP leak to android phones
+
