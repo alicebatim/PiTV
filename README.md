@@ -23,7 +23,7 @@ Clients can connect to the Pi’s SSID (`PiTV`), get an IP in the `192.168.50.x`
 Clone this repository and run the setup script on a fresh **Raspberry Pi OS Lite** installation:
 
 ```bash
-git clone https://github.com/yourname/pitv.git
+git clone https://github.com/alicebatim/pitv.git
 cd pitv
 chmod +x setup-pitv.sh
 ./setup-pitv.sh
