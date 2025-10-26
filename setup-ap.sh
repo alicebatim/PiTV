@@ -82,7 +82,7 @@ cat <<EOF | sudo tee /etc/hostapd/hostapd.conf
 interface=wlan0_ap
 ssid=PiTV
 hw_mode=g
-channel=1
+channel=11
 wmm_enabled=1
 auth_algs=1
 ignore_broadcast_ssid=0
