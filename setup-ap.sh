@@ -36,7 +36,11 @@ cat <<EOF | sudo tee /etc/systemd/network/10-wlan0.network
 Name=wlan0
 
 [Network]
-DHCP=yes
+Address=192.168.4.100/22
+Gateway=192.168.4.1
+DNS=192.168.4.1
+DHCP=no
+IPv6AcceptRA=no
 EOF
 
 cat <<EOF | sudo tee /etc/systemd/network/20-wlan0_ap.network
@@ -45,6 +49,7 @@ Name=wlan0_ap
 
 [Network]
 Address=192.168.50.1/24
+IPv6AcceptRA=no
 EOF
 
 sudo systemctl enable systemd-networkd
@@ -78,13 +83,16 @@ interface=wlan0_ap
 ssid=PiTV
 hw_mode=g
 channel=1
-wmm_enabled=0
+wmm_enabled=1
 auth_algs=1
 ignore_broadcast_ssid=0
 wpa=2
 wpa_passphrase=YourStrongPassword
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
+country_code=GB
+ieee80211d=1
+ieee80211n=1
 EOF
 
 sudo sed -i 's|#DAEMON_CONF="".*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
